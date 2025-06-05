@@ -1,0 +1,4 @@
+tweepy
+solana
+websockets
+colorama

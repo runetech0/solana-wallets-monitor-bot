@@ -41,7 +41,7 @@ async def main() -> None:
     try:
 
         me = await twitter_client.get_me()  # type: ignore
-        print(f"User logged-in as {me}")
+        logger.info(f"User logged-in as {me}")
 
     except Exception as e:
         return logger.error(f"User failed to login to twitter. {e}", exc_info=True)
