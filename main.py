@@ -2,7 +2,7 @@ from app.logs_config import get_logger
 from app.wallet_mon import WalletsMonitor, SplTokenBuy
 from app import io, gvs
 import asyncio
-from tweepy import Client  # type: ignore
+from tweepy.asynchronous import AsyncClient  # type: ignore
 from app.config_reader import Config
 from app import constants
 
@@ -45,7 +45,7 @@ async def main() -> None:
     if not (wallets := io.read_txt_lines(gvs.WALLETS_FILE)):
         return logger.error(f"No wallets in {gvs.WALLETS_FILE}")
 
-    twitter_client = Client(
+    twitter_client = AsyncClient(
         consumer_key=Config.TWITTER.API_KEY,
         consumer_secret=Config.TWITTER.API_KEY_SECRET,
         access_token=Config.TWITTER.API_ACCESS_TOKEN,
