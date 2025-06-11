@@ -24,13 +24,15 @@ python main.py
 *   Go to input/tweet-content.txt and put the Tweet content you want to be posted whenever there's a new buy alert is detected.
 *   Following is a list of place holders for the Tweet Template:
     ```
-    
-    __COIN_ADDRESS__ : Address of the bought coin
-    __COIN_NAME__: The name of the bought coin
-    __COIN_AMOUNT__: The amount of the bought coin
-    __TOTAL_USD_PAID__: Total amount of USD paid by the buyer
-    __BUYER_WALLET_ADDRESS__: The address of the buyer
-    __BUYER_NAME__: The name of the buyer
+
+COIN_ADDRESS_PLACEHOLDER = "__COIN_ADDRESS__"
+COIN_AMOUNT_PLACEHOLDER = "__COIN_AMOUNT__"
+COIN_NAME_PLACEHOLDER = "__COIN_NAME__"
+COIN_SYMBOL_PLACEHOLDER = "__COIN_SYMBOL__"
+TOTLA_USD_PAID_PLACEHOLDER = "__TOTAL_USD_PAID__"
+BUYER_WALLET_ADDRESS_PLACEHOLDER = "__BUYER_WALLET_ADDRESS__"
+BUYER_NAME_PLACEHOLDER = "__BUYER_NAME___"
+
     
     ``` 
 *   Enter the target solana wallets to be monitored in input/wallets.txt file. One wallet address per line.
