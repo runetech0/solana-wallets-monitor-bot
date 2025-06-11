@@ -4,10 +4,24 @@ from app import io, gvs
 import asyncio
 from tweepy import Client  # type: ignore
 from app.config_reader import Config
-from app.constants import TWEET_TEMPLATE_ADDR_REPLACE_STRING
+from app import constants
 
 
 logger = get_logger()
+
+
+def prepare_tweet_content(buy_info: SplTokenBuy) -> str:
+    text = open(gvs.TWEET_CONTENT_FILE).read().strip()
+    text = text.replace(constants.COIN_ADDRESS_PLACEHOLDER, buy_info["mint"])
+    text = text.replace(
+        constants.COIN_AMOUNT_PLACEHOLDER, str(buy_info["amount_received"])
+    )
+
+    text = text.replace(constants.COIN_NAME_PLACEHOLDER, buy_info["token_name"])
+    text = text.replace(constants.COIN_SYMBOL_PLACEHOLDER, buy_info["token_symbol"])
+    text = text.replace(constants.BUYER_WALLET_ADDRESS_PLACEHOLDER, buy_info["buyer"])
+
+    return text
 
 
 async def main() -> None:
@@ -47,17 +61,18 @@ async def main() -> None:
         return logger.error(f"User failed to login to twitter. {e}", exc_info=True)
 
     queue: asyncio.Queue[SplTokenBuy] = asyncio.Queue()
-    wallets_mon = WalletsMonitor(wallet_addresses=wallets, output_queue=queue)
+    wallets_mon = WalletsMonitor(
+        wallet_addresses=wallets,
+        output_queue=queue,
+        helius_api_key=Config.HELIUS.API_KEY,
+    )
 
     async def queue_handler() -> None:
         while True:
             new_buy = await queue.get()
             logger.info(f"New buy detected from a target user. {new_buy}")
-            text = tweet_content_template.replace(
-                TWEET_TEMPLATE_ADDR_REPLACE_STRING, new_buy["mint"]
-            )
             try:
-
+                text = prepare_tweet_content(new_buy)
                 logger.info("Posting bought token address in tweet ...")
                 created = await twitter_client.create_tweet(text=text)  # type: ignore
                 logger.info(f"Tweet posted successfully. {created}")

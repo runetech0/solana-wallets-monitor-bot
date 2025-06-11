@@ -5,6 +5,7 @@ import websockets
 from solana.rpc.api import Client
 from solders.signature import Signature
 from .logs_config import get_logger
+import httpx
 
 
 logger = get_logger()
@@ -21,16 +22,26 @@ class SplTokenBuy(TypedDict):
     previous_balance: float
     decimals: int
     type: str
+    token_name: str
+    token_symbol: str
 
 
 class WalletsMonitor:
     def __init__(
-        self, wallet_addresses: list[str], output_queue: asyncio.Queue[SplTokenBuy]
+        self,
+        wallet_addresses: list[str],
+        output_queue: asyncio.Queue[SplTokenBuy],
+        helius_api_key: str,
     ) -> None:
         self.wallet_addresses = wallet_addresses
         self._client = Client("https://api.mainnet-beta.solana.com")
         self._new_sig_queue: asyncio.Queue[str] = asyncio.Queue()
         self._output_queue = output_queue
+        self._helius_url = "https://mainnet.helius-rpc.com/"
+        self._helius_client = httpx.AsyncClient()
+        self._helius_api_key = helius_api_key
+
+        self._tasks: list[asyncio.Task[Any]] = []
 
     async def start(self) -> None:
 
@@ -40,15 +51,21 @@ class WalletsMonitor:
 
         except Exception as e:
             logger.error(f"Error in trx monitor. {e}", exc_info=True)
-            return await self.main()
+            await self.stop()
+            return await self.start()
+
+    async def stop(self) -> None:
+        for task in self._tasks:
+            if not task.cancelled() and not task.done():
+                task.cancel()
 
     async def main(self) -> None:
-        asyncio.create_task(self.monitor_wallet_transactions())
+        self._tasks.append(asyncio.create_task(self.monitor_wallet_transactions()))
         while True:
             trx_sig = await self._new_sig_queue.get()
             try:
                 trx = await self.fetch_trx(trx_sig)
-                res = self.detect_token_buy_from_meta(
+                res = await self.detect_token_buy_from_meta(
                     trx["meta"], self.wallet_addresses[0]
                 )
                 logger.info(res)
@@ -102,7 +119,7 @@ class WalletsMonitor:
                 if sig:
                     await self._new_sig_queue.put(sig)
 
-    def detect_token_buy_from_meta(
+    async def detect_token_buy_from_meta(
         self, meta: dict[str, Any], wallet: str
     ) -> SplTokenBuy | None:
         """
@@ -133,6 +150,7 @@ class WalletsMonitor:
                 pre_amt = pre_map.get(key, 0.0)
 
                 if post_amt > pre_amt:
+                    token_meta = await self.get_token_meta(mint)
                     return {
                         "buyer": wallet,
                         "mint": mint,
@@ -141,6 +159,8 @@ class WalletsMonitor:
                         "previous_balance": pre_amt,
                         "decimals": decimals,
                         "type": "spl-token-buy",
+                        "token_name": token_meta["name"],
+                        "token_symbol": token_meta["symbol"],
                     }
 
             return None  # No token purchase detected
@@ -148,3 +168,21 @@ class WalletsMonitor:
         except Exception as e:
             logger.error(f"[Token buy detection failed] {e}", exc_info=True)
             return None
+
+    async def get_token_meta(self, token_address: str) -> dict[str, Any]:
+
+        querystring = {"api-key": self._helius_api_key}
+
+        payload = {
+            "jsonrpc": "2.0",
+            "id": "1",
+            "method": "getAsset",
+            "params": {"id": token_address},
+        }
+        headers = {"Content-Type": "application/json"}
+
+        response = await self._helius_client.request(
+            "POST", self._helius_url, json=payload, headers=headers, params=querystring
+        )
+
+        return dict(response.json()["result"]["content"]["metadata"])
