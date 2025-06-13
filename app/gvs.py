@@ -1,6 +1,7 @@
 import os
 
 INPUT_DIR = "input"
+OUTPUT_DIR = "output"
 
 
 # input files

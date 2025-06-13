@@ -26,7 +26,7 @@ def prepare_tweet_content(buy_info: SplTokenBuy) -> str:
 
 async def main() -> None:
 
-    if not any(
+    if not all(
         [
             Config.TWITTER.API_KEY,
             Config.TWITTER.API_KEY_SECRET,
@@ -61,16 +61,11 @@ async def main() -> None:
         return logger.error(f"User failed to login to twitter. {e}", exc_info=True)
 
     queue: asyncio.Queue[SplTokenBuy] = asyncio.Queue()
-    wallets_mon = WalletsMonitor(
-        wallet_addresses=wallets,
-        output_queue=queue,
-        helius_api_key=Config.HELIUS.API_KEY,
-    )
 
     async def queue_handler() -> None:
         while True:
             new_buy = await queue.get()
-            logger.info(f"New buy detected from a target user. {new_buy}")
+            logger.info(f"New buy detected from a target wallet: {new_buy}")
             try:
                 text = prepare_tweet_content(new_buy)
                 logger.info("Posting bought token address in tweet ...")
@@ -81,8 +76,14 @@ async def main() -> None:
                 logger.error(f"Error posting tweet to twitter. {e}", exc_info=True)
 
     async with asyncio.TaskGroup() as gp:
-        gp.create_task(wallets_mon.start())
         gp.create_task(queue_handler())
+        for w in wallets:
+            wallets_mon = WalletsMonitor(
+                wallet=w,
+                output_queue=queue,
+                helius_api_key=Config.HELIUS.API_KEY,
+            )
+            gp.create_task(wallets_mon.start())
 
 
 if __name__ == "__main__":
